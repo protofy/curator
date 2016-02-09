@@ -32,9 +32,11 @@ logger = logging.getLogger(__name__)
                 help='Do not filter indices.  Act on all indices.')
 @click.option('--closed-only', is_flag=True,
                 help='Include only indices that are closed.')
+@click.option('--open-only', is_flag=True,
+              help='Include only indices that are open.')
 @click.pass_context
 def indices(ctx, newer_than, older_than, prefix, suffix, time_unit,
-            timestring, regex, exclude, index, all_indices, closed_only):
+            timestring, regex, exclude, index, all_indices, closed_only, open_only):
     """
     Get a list of indices to act on from the provided arguments, then perform
     the command [alias, allocation, bloom, close, delete, etc.] on the resulting
@@ -52,6 +54,12 @@ def indices(ctx, newer_than, older_than, prefix, suffix, time_unit,
         logger.error('At least one filter must be supplied.')
         msgout('{0}'.format(ctx.get_help()), quiet=ctx.parent.parent.params['quiet'])
         msgout('ERROR. At least one filter must be supplied.', error=True, quiet=ctx.parent.parent.params['quiet'])
+        sys.exit(1)
+
+    if closed_only and open_only:
+        logger.error('--closed-only and --open-only given, though exclude each other.')
+        msgout('{0}'.format(ctx.get_help()), quiet=ctx.parent.parent.params['quiet'])
+        msgout('ERROR. --closed-only and --open-only given, though exclude each other.', error=True, quiet=ctx.parent.parent.params['quiet'])
         sys.exit(1)
 
     logger.info("Job starting: {0} indices".format(ctx.parent.info_name))
@@ -89,6 +97,10 @@ def indices(ctx, newer_than, older_than, prefix, suffix, time_unit,
     if closed_only and not all_indices:
         logger.info("Pruning open indices, leaving only closed indices.")
         working_list = prune_opened(client, working_list)
+
+    if open_only and not all_indices:
+        logger.info("Pruning open indices, leaving only open indices.")
+        working_list = prune_closed(client, working_list)
 
     # Override any other flags if --all_indices specified
     if all_indices:
